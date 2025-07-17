@@ -2,9 +2,11 @@
 env/
 venv/
 
+
 # Python cache
 __pycache__/
 *.pyc
+
 
 # Django DB and settings
 db.sqlite3
