@@ -1,36 +1,44 @@
+from django.contrib.auth.base_user import BaseUserManager
 from django.db import models
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.contrib.auth.models import AbstractUser
 
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, email, password):
+    def create_user(self, username, email, date_of_birth, password, **extra_fields):
         if not email:
-            raise ValueError("Email is required")
-        user = self.model(email=self.normalize_email(email))
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-    
-    def create_superuser(self, email, password):
-        user = self.create_user(email, password)
+            raise ValueError('Email Field Must be set')
+        if not date_of_birth:
+            raise ValueError('Date of Birth Field must be set')
 
-        user.is_staff = True
-        user.is_superuser = True
-        user.save(using=self._db)
+        email = self.normalize_email(email)
+        user = self.model(username=username, email=email, date_of_birth=date_of_birth)
+        user.set_password(password)
+
         return user
+
+    def create_superuser(self, username, email, date_of_birth, password, **extra_fields):
+        if not email:
+            raise ValueError('Email is required')
+        if not date_of_birth:
+            raise ValueError('Date of Birth is Required')
+
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must be staff')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must be Superuse')
+
+        return self.create_user(username, email, date_of_birth, password, **extra_fields)
+
 
 class CustomUser(AbstractUser):
-    email = models.EmailField(unique=True, max_length=255)
-    username = models.CharField(unique=False, max_length=200)
-    date_of_birth = models.DateField()
+    date_of_birth = models.DateField(null=True, blank=True)
     profile_photo = models.ImageField()
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
-
     objects = CustomUserManager()
-
-
 
 
 class Book(models.Model):
@@ -40,8 +48,8 @@ class Book(models.Model):
 
     class Meta:
         permissions = [
-            ('can_view', 'Can view a book'),
-            ('can_create', 'Can create a book instance'),
-            ('can_edit', 'can edit an instance of a book'),
-            ('can_delete', 'can delete a book'),
-        ]
+            ('can_view', 'Can View'),
+            ('can_create', 'Can Create'),
+            ('can_edit', 'Can Edit'),
+            ('can_delete', 'Can Delete'),
+
