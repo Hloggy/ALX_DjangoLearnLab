@@ -8,7 +8,18 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         # Read permissions are allowed to any request
         if request.method in permissions.SAFE_METHODS:
             return True
-
+            
         # Write permissions are only allowed to the owner
-        return obj.created_by == request.user
+        return obj.added_by == request.user
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Allows full access to admin users, read-only to others
+    """
+    def has_permission(self, request, view):
+        # Read permissions are allowed to any request
+        if request.method in permissions.SAFE_METHODS:
+            return True
+            
+        # Write permissions are only allowed to admin users
+        return request.user and request.user.is_staff

@@ -1,13 +1,21 @@
-from rest_framework import generics, permissions, status
-from rest_framework.response import Response
+from rest_framework import generics, permissions
 from .models import Book
 from .serializers import BookSerializer
-from .permissions import IsOwnerOrReadOnly  # Custom permission
+from .permissions import IsOwnerOrReadOnly, IsAdminOrReadOnly
 
 class BookListView(generics.ListAPIView):
     """
     View to list all books (GET)
-    Public access (no authentication required)
+    Accessible to all users (authenticated or not)
+    """
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    permission_classes = [permissions.AllowAny]  # Allow anyone to view
+
+class BookDetailView(generics.RetrieveAPIView):
+    """
+    View to retrieve a single book by ID (GET)
+    Accessible to all users
     """
     queryset = Book.objects.all()
     serializer_class = BookSerializer
@@ -16,50 +24,43 @@ class BookListView(generics.ListAPIView):
 class BookCreateView(generics.CreateAPIView):
     """
     View to create a new book (POST)
-    Requires authentication
+    Restricted to authenticated users
     """
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Automatically set the creator to the current user
-        serializer.save(created_by=self.request.user)
+        """Automatically set the current user as the book's owner"""
+        serializer.save(added_by=self.request.user)
 
-class BookDetailView(generics.RetrieveAPIView):
-    """
-    View to retrieve a single book (GET)
-    Public access
-    """
-    queryset = Book.objects.all()
-    serializer_class = BookSerializer
-    permission_classes = [permissions.AllowAny]
+    def create(self, request, *args, **kwargs):
+        """Customize the response format"""
+        response = super().create(request, *args, **kwargs)
+        # Add custom response data
+        response.data = {
+            'status': 'success',
+            'data': response.data,
+            'message': 'Book created successfully',
+            'created_at': timezone.now().isoformat()
+        }
+        return response
 
 class BookUpdateView(generics.UpdateAPIView):
     """
-    View to update a book (PUT/PATCH)
-    Requires authentication and ownership
+    View to update an existing book (PUT/PATCH)
+    Restricted to authenticated users
     """
     queryset = Book.objects.all()
     serializer_class = BookSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
-
-    def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+    permission_classes = [permissions.IsAuthenticated,IsOwnerOrReadOnly]
 
 class BookDeleteView(generics.DestroyAPIView):
     """
     View to delete a book (DELETE)
-    Requires authentication and ownership
+    Restricted to authenticated users
     """
     queryset = Book.objects.all()
     serializer_class = BookSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated,IsOwnerOrReadOnly]
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(
-            {"status": "success", "message": "Book deleted successfully"},
-            status=status.HTTP_204_NO_CONTENT
-        )
