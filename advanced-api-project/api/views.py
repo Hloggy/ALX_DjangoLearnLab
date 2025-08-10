@@ -1,44 +1,49 @@
-from rest_framework import generics, permissions
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Author, Book
-from .serializers import AuthorSerializer, BookSerializer
-from .permissions import IsAdminOrReadOnly
+from django_filters import rest_framework
+from rest_framework import generics, filters
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from .models import Book
+from .seriealizers import BookSerializer
 
-class BookListView(generics.ListAPIView):
-    """
-    View to list all books (GET)
-    """
+class CustomBookListView(generics.ListAPIView):
+    serializer_class = BookSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [rest_framework.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'author',]
+    ordering_fields = ['title', 'publication_year']
+
+    def get_queryset(self):
+        queryset = Book.objects.all()
+        title = self.request.query_params.get('title')
+        author = self.request.query_params.get('author')
+        publication_year = self.request.query_params.get('publication_year')
+
+        if title:
+            queryset = queryset.filter(title__icontains=title)
+        if author:
+            queryset = queryset.filter(author__icontains=author)
+        if publication_year:
+            queryset = queryset.filter(publication_year__icontains=publication_year)
+        return queryset
+
+
+
+
+class CustomBookDetailView(generics.RetrieveAPIView):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
-class BookCreateView(generics.CreateAPIView):
+class CustomBookCreateView(generics.CreateAPIView):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
-class BookCreateView(generics.CreateAPIView):
+class CustomBookUpdateView(generics.UpdateAPIView):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        # Add custom logic before saving
-        serializer.save()  # You could add additional parameters here if needed
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(
-            {
-                'status': 'success',
-                'message': 'Book created successfully',
-                'data': serializer.data
-            },
-            status=status.HTTP_201_CREATED,
-            headers=headers
-        )
-
+class CustomBookDeleteView(generics.DestroyAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    permission_classes = [IsAuthenticated]
