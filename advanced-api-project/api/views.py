@@ -1,66 +1,44 @@
 from rest_framework import generics, permissions
-from .models import Book
-from .serializers import BookSerializer
-from .permissions import IsOwnerOrReadOnly, IsAdminOrReadOnly
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Author, Book
+from .serializers import AuthorSerializer, BookSerializer
+from .permissions import IsAdminOrReadOnly
 
 class BookListView(generics.ListAPIView):
     """
     View to list all books (GET)
-    Accessible to all users (authenticated or not)
-    """
-    queryset = Book.objects.all()
-    serializer_class = BookSerializer
-    permission_classes = [permissions.AllowAny]  # Allow anyone to view
-
-class BookDetailView(generics.RetrieveAPIView):
-    """
-    View to retrieve a single book by ID (GET)
-    Accessible to all users
     """
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     permission_classes = [permissions.AllowAny]
 
 class BookCreateView(generics.CreateAPIView):
-    """
-    View to create a new book (POST)
-    Restricted to authenticated users
-    """
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrReadOnly]
+
+class BookCreateView(generics.CreateAPIView):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        """Automatically set the current user as the book's owner"""
-        serializer.save(added_by=self.request.user)
+        # Add custom logic before saving
+        serializer.save()  # You could add additional parameters here if needed
 
     def create(self, request, *args, **kwargs):
-        """Customize the response format"""
-        response = super().create(request, *args, **kwargs)
-        # Add custom response data
-        response.data = {
-            'status': 'success',
-            'data': response.data,
-            'message': 'Book created successfully',
-            'created_at': timezone.now().isoformat()
-        }
-        return response
-
-class BookUpdateView(generics.UpdateAPIView):
-    """
-    View to update an existing book (PUT/PATCH)
-    Restricted to authenticated users
-    """
-    queryset = Book.objects.all()
-    serializer_class = BookSerializer
-    permission_classes = [permissions.IsAuthenticated,IsOwnerOrReadOnly]
-
-class BookDeleteView(generics.DestroyAPIView):
-    """
-    View to delete a book (DELETE)
-    Restricted to authenticated users
-    """
-    queryset = Book.objects.all()
-    serializer_class = BookSerializer
-    permission_classes = [permissions.IsAuthenticated,IsOwnerOrReadOnly]
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            {
+                'status': 'success',
+                'message': 'Book created successfully',
+                'data': serializer.data
+            },
+            status=status.HTTP_201_CREATED,
+            headers=headers
+        )
 
