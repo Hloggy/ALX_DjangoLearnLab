@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Django Blog{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body data-auth="{% if user.is_authenticated %}true{% else %}false{% endif %}">
+    <header>
+        <nav>
+            <ul id="nav-list">
+                <li><a href="{% url 'home' %}" class="nav-item" id="nav-home">Home</a></li>
+                <li><a href="{% url 'posts' %}" class="nav-item" id="nav-posts">Blog Posts</a></li>
+
+                {% if user.is_authenticated %}
+                    <li><a href="{% url 'profile' %}" class="nav-item" id="nav-profile">Profile</a></li>
+
+                    <!-- Form for logging out -->
+                    <li>
+                        <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="nav-item" style="background: none; border: none; cursor: pointer; color: white; text-decoration: underline;">
+                                Logout
+                            </button>
+                        </form>
+                    </li>
+                {% else %}
+                    <li><a href="{% url 'login' %}" class="nav-item" id="nav-login">Login</a></li>
+                    <li><a href="{% url 'register' %}" class="nav-item" id="nav-register">Register</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+
+    <main class="content">
+        <!-- Display messages for the entire site -->
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <div class="content">
+            {% block content %}
+            <!-- Page-specific content goes here -->
+            {% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Django Blog</p>
+    </footer>
+
+    <script src="{% static 'js/scripts.js' %}"></script>
+</body>
+</html>
+
