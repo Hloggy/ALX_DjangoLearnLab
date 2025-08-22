@@ -20,5 +20,6 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('rest_framework.urls')),  # For login/logout
-    path('api/', include('posts.urls')),  # Include posts URLs
+    path('api/accounts/', include('accounts.urls')),    # For user accounts
+    path('api/', include('posts.urls')),                # For posts and comments
 ]
