@@ -22,4 +22,6 @@ urlpatterns = [
     path('api/auth/', include('rest_framework.urls')),  # For login/logout
     path('api/accounts/', include('accounts.urls')),    # For user accounts
     path('api/', include('posts.urls')),                # For posts and comments
+    path('api/notifications/', include('notifications.urls')),
+    path('api/', include('posts.urls')),
 ]

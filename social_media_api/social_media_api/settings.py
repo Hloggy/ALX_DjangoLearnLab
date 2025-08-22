@@ -43,6 +43,9 @@ INSTALLED_APPS = [
     'accounts',
     'posts',
     'django_filters',
+    'followers',
+    'notifications',
+    'posts.apps.PostsConfig'
 ]
 
 MIDDLEWARE = [

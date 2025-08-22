@@ -52,3 +52,44 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def like_post(request, pk):
+    try:
+        post = Post.objects.get(pk=pk)
+    except Post.DoesNotExist:
+        return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Check if user already liked this post
+    if Like.objects.filter(user=request.user, post=post).exists():
+        return Response({'error': 'You already liked this post'}, status=status.HTTP_400_BAD_REQUEST)
+
+# Create like
+    like = Like.objects.create(user=request.user, post=post)
+
+    # Create notification if the post owner is not the one liking
+    if post.author != request.user:
+        Notification.objects.create(
+            recipient=post.author,
+            actor=request.user,
+            verb=f"liked your post",
+            notification_type='like'
+        )
+
+    serializer = LikeSerializer(like)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def unlike_post(request, pk):
+    try:
+        post = Post.objects.get(pk=pk)
+    except Post.DoesNotExist:
+        return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        like = Like.objects.get(user=request.user, post=post)
+        like.delete()
+        return Response({'message': 'Post unliked successfully'}, status=status.HTTP_200_OK)
+    except Like.DoesNotExist:
+        return Response({'error': 'You have not liked this post'}, status=status.HTTP_400_BAD_REQUEST)
