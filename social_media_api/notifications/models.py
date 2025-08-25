@@ -1,29 +1,22 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from accounts.models import CustomUser
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
-User = get_user_model()
+
+# Create your models here.
 
 class Notification(models.Model):
-    NOTIFICATION_TYPES = (
-        ('like', 'Like'),
-        ('comment', 'Comment'),
-        ('follow', 'Follow'),
-        ('mention', 'Mention'),
-    )
+    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='notifications')
+    actor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='actor_notifications')
+    verb = models.CharField(max_length=150)
 
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    actor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='acted_notifications')
-    verb = models.CharField(max_length=255)
-    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
-    is_read = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    target_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
+    target_object_id = models.PositiveIntegerField(blank=True, null=True)
+    target = GenericForeignKey('target_content_type', 'target_object_id')
 
-    class Meta:
-        ordering = ['-created_at']
+    timestamp = models.DateTimeField(auto_now_add=True)
 
-    def _str_(self):
-        return f"{self.actor.username} {self.verb} - {self.recipient.username}"
+    def __str__(self):
+        return f"{self.actor.email} {self.verb} {self.target} to {self.recipient.email}"
 
-    def mark_as_read(self):
-        self.is_read = True
-        self.save()

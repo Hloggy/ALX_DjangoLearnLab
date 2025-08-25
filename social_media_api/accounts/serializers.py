@@ -1,60 +1,41 @@
 from rest_framework import serializers
-from django.contrib.auth import authenticate
-from .models import CustomUser
+from django.contrib.auth import get_user_model
+from rest_framework.authtoken.models import Token
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
-    password_confirm = serializers.CharField(write_only=True)
+User = get_user_model()
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = CustomUser
-        fields = ('username', 'email', 'password', 'password_confirm', 'first_name', 'last_name', 'bio')
-
-    def validate(self, data):
-        if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError("Passwords don't match")
-        return data
+        model = User
+        fields = ['email', 'password', 'bio', 'profile_picture']
 
     def create(self, validated_data):
-        validated_data.pop('password_confirm')
-        user = CustomUser.objects.create_user(
-            username=validated_data['username'],
+        user = get_user_model().objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            bio=validated_data.get('bio', '')
+            bio=validated_data.get('bio', None),
+            profile_picture=validated_data.get('profile_picture', None)
         )
+        Token.objects.create(user=user)
         return user
 
-class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField()
 
-    def validate(self, data):
-        username = data.get('username')
-        password = data.get('password')
+class TokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
 
-        if username and password:
-            user = authenticate(username=username, password=password)
-            if user:
-                if user.is_active:
-                    data['user'] = user
-                else:
-                    raise serializers.ValidationError("User account is disabled.")
-            else:
-                raise serializers.ValidationError("Unable to log in with provided credentials.")
-        else:
-            raise serializers.ValidationError("Must include 'username' and 'password'.")
 
-        return data
-
-class UserProfileSerializer(serializers.ModelSerializer):
-    followers_count = serializers.ReadOnlyField()
-    following_count = serializers.ReadOnlyField()
-
+class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomUser
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'bio', 
-                 'profile_picture', 'followers_count', 'following_count', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        model = User
+        fields = ['email', 'password', 'bio', 'profile_picture', 'followers']
+        read_only_fields = ['email', 'followers']
+
+
+class FollowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email']
+

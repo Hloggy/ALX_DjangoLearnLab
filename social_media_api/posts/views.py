@@ -1,95 +1,102 @@
-from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework import viewsets, generics, permissions, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
-from .models import Post, Comment
-from .serializers import (
-    PostSerializer, PostCreateSerializer, 
-    CommentSerializer, CommentCreateSerializer
-)
-from .permissions import IsAuthorOrReadOnly
+from rest_framework.views import APIView
+from django_filters import rest_framework
+from rest_framework import filters
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from .serializers import PostSerializer, CommentSerializer
+from .models import Post, Comment, Like
+from notifications.models import Notification
+
+
+# Create your  here.
+
 
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['author']
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [rest_framework.DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['title', 'content']
     search_fields = ['title', 'content']
-    ordering_fields = ['created_at', 'updated_at']
-    ordering = ['-created_at']
 
-    def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return PostCreateSerializer
-        return PostSerializer
+    def get_object(self):
+        post = super().get_object()
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        if self.request.method in ['PUT', 'PATCH', 'DELETE']:
+            if post.author != self.request.user:
+                raise PermissionDenied("You Do not have permission to modify this post")
+        return post
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def comment(self, request, pk=None):
-        post = self.get_object()
-        serializer = CommentCreateSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            comment = serializer.save(post=post, author=request.user)
-            response_serializer = CommentSerializer(comment)
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [rest_framework.DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['title', 'content']
+    search_fields = ['title', 'content']
 
-    def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return CommentCreateSerializer
-        return CommentSerializer
+    def get_object(self):
+        comment = super().get_object()
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        if self.request.method in ['PUT', 'PATCH', 'DELETE']:
+            if comment.author != self.request.user:
+                raise PermissionDenied('You do not have permission to modify this comment')
+        return comment
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def like_post(request, pk):
-    try:
-        post = Post.objects.get(pk=pk)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    # Check if user already liked this post
-    if Like.objects.filter(user=request.user, post=post).exists():
-        return Response({'error': 'You already liked this post'}, status=status.HTTP_400_BAD_REQUEST)
+class FeedView(generics.ListAPIView):
+    serializer_class = PostSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-# Create like
-    like = Like.objects.create(user=request.user, post=post)
+    def get_queryset(self):
+        user = self.request.user
+        following_users = user.following.all()
 
-    # Create notification if the post owner is not the one liking
-    if post.author != request.user:
+        return Post.objects.filter(author__in=following_users).order_by('-created_at')
+
+
+class LikePostView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        post = generics.get_object_or_404(Post, pk=pk)
+
+        like, create = Like.objects.get_or_create(user=request.user, post=post)
+
+        if not create:
+            return Response({'error': 'you have already liked this post'}, status=status.HTTP_400_BAD_REQUEST)
+
         Notification.objects.create(
             recipient=post.author,
             actor=request.user,
-            verb=f"liked your post",
-            notification_type='like'
+            verb='liked',
+            target=post
         )
 
-    serializer = LikeSerializer(like)
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response({'status': 'Post Liked'}, status=status.HTTP_201_CREATED)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def unlike_post(request, pk):
-    try:
-        post = Post.objects.get(pk=pk)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        like = Like.objects.get(user=request.user, post=post)
+class UnlikePostView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        post = generics.get_object_or_404(Post, pk=pk)
+
+        like = Like.objects.filter(user=request.user, post=post).first()
+        if not like:
+            return Response({'error': 'you have not liked this post'}, status=status.HTTP_400_BAD_REQUEST)
+
         like.delete()
-        return Response({'message': 'Post unliked successfully'}, status=status.HTTP_200_OK)
-    except Like.DoesNotExist:
-        return Response({'error': 'You have not liked this post'}, status=status.HTTP_400_BAD_REQUEST)
+
+        Notification.objects.create(
+            recipient=post.author,
+            actor=request.user,
+            verb='unliked',
+            target=post
+        )
+
+        return Response({'status': 'Post Unliked'}, status=status.HTTP_200_OK)
+

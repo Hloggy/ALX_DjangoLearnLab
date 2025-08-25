@@ -1,49 +1,34 @@
 from rest_framework import serializers
-from .models import Post, Comment, Like
-from django.contrib.auth import get_user_model
+from .models import Post, Comment
 
-User = get_user_model()
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email']
-
-class CommentSerializer(serializers.ModelSerializer):
-    author = UserSerializer(read_only=True)
-    
-    class Meta:
-        model = Comment
-        fields = ['id', 'post', 'author', 'content', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'author', 'created_at', 'updated_at']
 
 class PostSerializer(serializers.ModelSerializer):
-    author = UserSerializer(read_only=True)
-    comments = CommentSerializer(many=True, read_only=True)
-    comments_count = serializers.SerializerMethodField()
-    
+    author = serializers.ReadOnlyField(source='author.email')
+    created_at = serializers.ReadOnlyField()
+    updated_at = serializers.ReadOnlyField()
+
     class Meta:
         model = Post
-        fields = ['id', 'author', 'title', 'content', 'created_at', 'updated_at', 'comments', 'comments_count']
-        read_only_fields = ['id', 'author', 'created_at', 'updated_at', 'comments']
+        fields = ['id', 'author', 'title', 'content', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        validated_data['author'] = request.user
+        return super().create(validated_data)
+
     
-    def get_comments_count(self, obj):
-        return obj.comments.count()
-
-class PostCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Post
-        fields = ['title', 'content']
-
-class CommentCreateSerializer(serializers.ModelSerializer):
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.ReadOnlyField(source='author.email')
+    created_at = serializers.ReadOnlyField()
+    updated_at = serializers.ReadOnlyField()
+    post = serializers.SlugRelatedField(slug_field='title', queryset=Post.objects.all())
+    
     class Meta:
         model = Comment
-        fields = ['content']
+        fields = ['id', 'author', 'post', 'content', 'created_at', 'updated_at']
 
-class LikeSerializer(serializers.ModelSerializer):
-    user_username = serializers.CharField(source='user.username', read_only=True)
+    def create(self, validated_data):
+        request = self.context.get('request')
+        validated_data['author'] = request.user
+        return super().create(validated_data)
 
-    class Meta:
-        model = Like
-        fields = ['id', 'user', 'user_username', 'post', 'created_at']
-        read_only_fields = ['id', 'user', 'created_at']

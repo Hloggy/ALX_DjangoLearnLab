@@ -1,59 +1,32 @@
 from django.db import models
-from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
+from accounts.models import CustomUser
 
-User = get_user_model()
 
-# Your existing Post model should be here first
+# Create your models here.
+
 class Post(models.Model):
-    # ... your existing Post model fields ...
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='posts')
+    title = models.CharField(max_length=180)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    # ... any other fields and methods ...
 
-    def _str_(self):
-        return f"Post by {self.author.username}"
 
-# Add Comment model
 class Comment(models.Model):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='comments')
 
-    class Meta:
-        ordering = ['-created_at']
 
-    def _str_(self):
-        return f"Comment by {self.author.username} on post {self.post.id}"
-
-# Add Like model
 class Like(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='likes')
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='likes')
-    created_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='user_likes')
 
     class Meta:
-        unique_together = ('user', 'post')  # Prevent duplicate likes
-        ordering = ['-created_at']
+        unique_together = ('post', 'user')
 
-    def _str_(self):
-        return f"{self.user.username} likes {self.post.id}"
+    def __str__(self):
+        return f"{self.user.email} liked {self.post.title}"
 
-# Then add the Like model
-class Like(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='likes')
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='likes')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('user', 'post')  # Prevent duplicate likes
-        ordering = ['-created_at']
-
-    def _str_(self):
-        return f"{self.user.username} likes {self.post.id}"

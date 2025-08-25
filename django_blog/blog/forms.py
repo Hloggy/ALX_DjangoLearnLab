@@ -1,6 +1,6 @@
 from django import forms
 from taggit.forms import TagWidget
-from taggit.utils import slugify
+from django.utils.text import slugify
 from .models import Profile, Post, Comment, Tag
 
 
